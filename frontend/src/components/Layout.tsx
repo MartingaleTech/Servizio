@@ -53,6 +53,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/admin/users', icon: Users, label: 'Users' },
     { path: '/admin/verifications', icon: Shield, label: 'Verify' },
     { path: '/admin/events', icon: Calendar, label: 'Events' },
+    { path: '/admin/payouts', icon: DollarSign, label: 'Payouts' },
     { path: '/admin/disputes', icon: AlertTriangle, label: 'Disputes' },
     { path: '/admin/pricing', icon: Settings, label: 'Pricing' },
   ];

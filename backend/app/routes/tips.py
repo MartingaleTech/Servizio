@@ -75,10 +75,13 @@ def create_tip(
             )
             db.add(notif)
     elif data.split_type == "per_worker" and data.worker_tips:
+        valid_worker_ids = {s.worker_id for s in shifts}
         for wt in data.worker_tips:
             worker_id = wt.get("worker_id")
             amount = wt.get("amount", 0)
             if not worker_id or amount <= 0:
+                continue
+            if worker_id not in valid_worker_ids:
                 continue
             tip = Tip(
                 event_id=data.event_id,
