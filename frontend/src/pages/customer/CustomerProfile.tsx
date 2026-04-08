@@ -11,14 +11,15 @@ export default function CustomerProfile() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     Promise.all([
       api.get<Event[]>('/api/events').catch(() => []),
-      api.get<Rating[]>('/api/ratings/my-ratings').catch(() => []),
+      api.get<Rating[]>(`/api/ratings/user/${user.id}`).catch(() => []),
     ]).then(([e, r]) => {
       setEvents(e);
       setRatings(r);
     }).finally(() => setLoading(false));
-  }, []);
+  }, [user]);
 
   const workerRatings = ratings.filter(r => r.rating_type === 'worker_to_customer');
   const avgRating = workerRatings.length > 0
