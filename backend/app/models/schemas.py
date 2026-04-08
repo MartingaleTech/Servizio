@@ -60,6 +60,8 @@ class WorkerProfileCreate(BaseModel):
     home_latitude: Optional[float] = None
     home_longitude: Optional[float] = None
     max_travel_distance_km: Optional[float] = 20.0
+    skills_tags: Optional[str] = None
+    certifications: Optional[str] = None
 
 
 class WorkerProfileUpdate(BaseModel):
@@ -74,6 +76,8 @@ class WorkerProfileUpdate(BaseModel):
     home_longitude: Optional[float] = None
     max_travel_distance_km: Optional[float] = None
     is_accepting_jobs: Optional[bool] = None
+    skills_tags: Optional[str] = None
+    certifications: Optional[str] = None
 
 
 class WorkerProfileResponse(BaseModel):
@@ -95,6 +99,9 @@ class WorkerProfileResponse(BaseModel):
     total_events_completed: int
     verification_status: str
     full_name: Optional[str] = None
+    skills_tags: Optional[str] = None
+    certifications: Optional[str] = None
+    event_types_worked: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -286,6 +293,13 @@ class ShiftResponse(BaseModel):
     planned_end: Optional[datetime] = None
     hours_worked: Optional[float] = None
     pay_amount: Optional[float] = None
+    is_overtime: bool = False
+    overtime_hours: float = 0.0
+    overtime_approved: Optional[bool] = None
+    worker_latitude: Optional[float] = None
+    worker_longitude: Optional[float] = None
+    eta_minutes: Optional[int] = None
+    arrived_at: Optional[datetime] = None
     created_at: datetime
     event_name: Optional[str] = None
     worker_name: Optional[str] = None
@@ -325,7 +339,9 @@ class PayoutResponse(BaseModel):
     shift_id: str
     event_id: str
     amount: float
+    tip_amount: float = 0.0
     status: str
+    payout_method: Optional[str] = None
     paid_at: Optional[datetime] = None
     created_at: datetime
     event_name: Optional[str] = None
@@ -407,6 +423,142 @@ class AdminStats(BaseModel):
 class WorkerAssignment(BaseModel):
     worker_id: str
     role: str
+
+
+# ---- V1: Chat Schemas ----
+
+class ChatRoomResponse(BaseModel):
+    id: str
+    event_id: Optional[str] = None
+    room_type: str
+    name: Optional[str] = None
+    created_by: str
+    is_active: bool
+    created_at: datetime
+    members: list[str] = []
+    last_message: Optional[str] = None
+    unread_count: int = 0
+
+    class Config:
+        from_attributes = True
+
+
+class ChatMessageCreate(BaseModel):
+    message: str
+    is_quick_message: bool = False
+
+
+class ChatMessageResponse(BaseModel):
+    id: str
+    room_id: str
+    sender_id: str
+    message: str
+    is_quick_message: bool
+    is_read: bool
+    created_at: datetime
+    sender_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SupportChatCreate(BaseModel):
+    subject: Optional[str] = None
+
+
+# ---- V1: Tip Schemas ----
+
+class TipCreate(BaseModel):
+    event_id: str
+    amount: float
+    split_type: str = "even"  # "even" or "per_worker"
+    worker_tips: Optional[list[dict]] = None  # [{"worker_id": "...", "amount": 10.0}]
+
+
+class TipResponse(BaseModel):
+    id: str
+    event_id: str
+    booking_id: str
+    from_customer_id: str
+    to_worker_id: Optional[str] = None
+    amount: float
+    split_type: str
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ---- V1: Dispute Schemas ----
+
+class DisputeCreate(BaseModel):
+    event_id: str
+    booking_id: Optional[str] = None
+    filed_against: Optional[str] = None
+    dispute_type: str  # "cancellation", "no_show", "quality", "payment", "overtime", "other"
+    description: str
+
+
+class DisputeResponse(BaseModel):
+    id: str
+    event_id: str
+    booking_id: Optional[str] = None
+    filed_by: str
+    filed_against: Optional[str] = None
+    dispute_type: str
+    description: str
+    status: str
+    resolution: Optional[str] = None
+    resolved_by: Optional[str] = None
+    refund_amount: Optional[float] = None
+    payout_adjustment: Optional[float] = None
+    created_at: datetime
+    filed_by_name: Optional[str] = None
+    filed_against_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class DisputeResolve(BaseModel):
+    status: str  # "resolved", "dismissed"
+    resolution: str
+    refund_amount: Optional[float] = None
+    payout_adjustment: Optional[float] = None
+
+
+# ---- V1: Cancellation Policy Schemas ----
+
+class CancellationPolicyResponse(BaseModel):
+    id: str
+    policy_type: str
+    hours_before_free_cancel: int
+    late_cancel_fee_percent: float
+    no_show_fee_percent: float
+    worker_cancel_rating_penalty: float
+    worker_cancel_suspension_hours: int
+
+    class Config:
+        from_attributes = True
+
+
+class CancellationPolicyUpdate(BaseModel):
+    hours_before_free_cancel: Optional[int] = None
+    late_cancel_fee_percent: Optional[float] = None
+    no_show_fee_percent: Optional[float] = None
+    worker_cancel_rating_penalty: Optional[float] = None
+    worker_cancel_suspension_hours: Optional[int] = None
+
+
+class ShiftLocationUpdate(BaseModel):
+    latitude: float
+    longitude: float
+    eta_minutes: Optional[int] = None
+
+
+class OvertimeAction(BaseModel):
+    action: str  # "approve", "dispute"
 
 
 # Forward reference resolution

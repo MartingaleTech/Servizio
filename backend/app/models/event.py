@@ -81,6 +81,14 @@ class Shift(Base):
     planned_end = Column(DateTime, nullable=True)
     hours_worked = Column(Float, nullable=True)
     pay_amount = Column(Float, nullable=True)
+    # V1: Enhanced shift fields
+    is_overtime = Column(Boolean, default=False)
+    overtime_hours = Column(Float, default=0.0)
+    overtime_approved = Column(Boolean, nullable=True)  # None=pending, True=approved, False=disputed
+    worker_latitude = Column(Float, nullable=True)  # GPS tracking
+    worker_longitude = Column(Float, nullable=True)
+    eta_minutes = Column(Integer, nullable=True)  # Estimated time of arrival
+    arrived_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
@@ -108,7 +116,9 @@ class Payout(Base):
     shift_id = Column(String, nullable=False)
     event_id = Column(String, nullable=False)
     amount = Column(Float, default=0.0)
+    tip_amount = Column(Float, default=0.0)  # V1: Tip tracking
     status = Column(String, default="pending")  # pending, processing, paid
+    payout_method = Column(String, nullable=True)  # V1: bank_transfer, paypal, etc.
     paid_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
@@ -146,4 +156,91 @@ class PricingRule(Base):
     role = Column(String, nullable=False, unique=True)  # server, bartender, cleaner
     hourly_rate = Column(Float, nullable=False)
     platform_fee_percent = Column(Float, default=15.0)
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+# ---- V1: Chat Models ----
+
+class ChatRoom(Base):
+    __tablename__ = "chat_rooms"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    event_id = Column(String, nullable=True, index=True)  # null for support chats
+    room_type = Column(String, nullable=False)  # "event", "support"
+    name = Column(String, nullable=True)
+    created_by = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    room_id = Column(String, nullable=False, index=True)
+    sender_id = Column(String, nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    is_quick_message = Column(Boolean, default=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class ChatRoomMember(Base):
+    __tablename__ = "chat_room_members"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    room_id = Column(String, nullable=False, index=True)
+    user_id = Column(String, nullable=False, index=True)
+    joined_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ---- V1: Tip Model ----
+
+class Tip(Base):
+    __tablename__ = "tips"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    event_id = Column(String, nullable=False, index=True)
+    booking_id = Column(String, nullable=False, index=True)
+    from_customer_id = Column(String, nullable=False, index=True)
+    to_worker_id = Column(String, nullable=True, index=True)  # null if split evenly
+    amount = Column(Float, nullable=False)
+    split_type = Column(String, default="even")  # "even", "per_worker"
+    status = Column(String, default="pending")  # pending, paid
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+# ---- V1: Dispute Model ----
+
+class Dispute(Base):
+    __tablename__ = "disputes"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    event_id = Column(String, nullable=False, index=True)
+    booking_id = Column(String, nullable=True, index=True)
+    filed_by = Column(String, nullable=False, index=True)  # user_id
+    filed_against = Column(String, nullable=True, index=True)  # user_id
+    dispute_type = Column(String, nullable=False)  # "cancellation", "no_show", "quality", "payment", "overtime", "other"
+    description = Column(Text, nullable=False)
+    status = Column(String, default="open")  # open, under_review, resolved, dismissed
+    resolution = Column(Text, nullable=True)
+    resolved_by = Column(String, nullable=True)
+    refund_amount = Column(Float, nullable=True)
+    payout_adjustment = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+# ---- V1: Cancellation Policy Model ----
+
+class CancellationPolicy(Base):
+    __tablename__ = "cancellation_policies"
+
+    id = Column(String, primary_key=True, default=generate_uuid)
+    policy_type = Column(String, nullable=False, unique=True)  # "customer", "worker"
+    hours_before_free_cancel = Column(Integer, default=48)  # Hours before event for free cancellation
+    late_cancel_fee_percent = Column(Float, default=50.0)  # % of booking charged for late cancel
+    no_show_fee_percent = Column(Float, default=100.0)  # % charged for no-show
+    worker_cancel_rating_penalty = Column(Float, default=0.5)  # Rating penalty for worker cancellation
+    worker_cancel_suspension_hours = Column(Integer, default=0)  # Temporary suspension in hours
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

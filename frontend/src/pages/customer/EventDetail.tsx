@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../../services/api';
-import type { Event, Quote, Booking, Shift, Invoice } from '../../types';
+import type { Event, Quote, Booking, Shift, Invoice, Rating } from '../../types';
 import {
   ArrowLeft, Calendar, MapPin, Users, DollarSign,
-  CheckCircle, CreditCard, FileText,
+  CheckCircle, CreditCard, FileText, Star, Heart,
+  MessageCircle, AlertTriangle, Navigation, Clock,
 } from 'lucide-react';
 
 export default function EventDetail() {
@@ -15,6 +16,7 @@ export default function EventDetail() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [invoice, setInvoice] = useState<Invoice | null>(null);
+  const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [error, setError] = useState('');
@@ -27,12 +29,14 @@ export default function EventDetail() {
       api.get<Booking | null>(`/api/events/${eventId}/booking`).catch(() => null),
       api.get<Shift[]>(`/api/events/${eventId}/shifts`).catch(() => []),
       api.get<Invoice | null>(`/api/events/${eventId}/invoice`).catch(() => null),
-    ]).then(([e, q, b, s, i]) => {
+      api.get<Rating[]>(`/api/ratings/event/${eventId}`).catch(() => []),
+    ]).then(([e, q, b, s, i, r]) => {
       setEvent(e);
       setQuote(q);
       setBooking(b);
       setShifts(s);
       setInvoice(i);
+      setRatings(r);
     }).catch(console.error)
       .finally(() => setLoading(false));
   }, [eventId]);
@@ -58,18 +62,25 @@ export default function EventDetail() {
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-12 text-gray-500">Loading event...</div>;
-  }
+  const handleOvertimeAction = async (shiftId: string, action: 'approve' | 'dispute') => {
+    if (!eventId) return;
+    try {
+      await api.put(`/api/events/${eventId}/shifts/${shiftId}/overtime`, { action });
+      const s = await api.get<Shift[]>(`/api/events/${eventId}/shifts`);
+      setShifts(s);
+    } catch { /* */ }
+  };
 
-  if (!event) {
-    return <div className="text-center py-12 text-gray-500">Event not found</div>;
-  }
+  if (loading) return <div className="text-center py-12 text-gray-500">Loading event...</div>;
+  if (!event) return <div className="text-center py-12 text-gray-500">Event not found</div>;
 
   const hours = Math.max(
     (new Date(event.end_datetime).getTime() - new Date(event.start_datetime).getTime()) / 3600000,
     1
   );
+
+  const isCompleted = event.status === 'completed' || shifts.some(s => ['clocked_out', 'completed'].includes(s.status));
+  const hasRated = ratings.some(r => r.rating_type === 'customer_to_worker');
 
   const statusColor: Record<string, string> = {
     draft: 'bg-gray-100 text-gray-700',
@@ -210,7 +221,7 @@ export default function EventDetail() {
         </div>
       )}
 
-      {/* Assigned Workers */}
+      {/* V1: Assigned Workers with GPS & Overtime */}
       {shifts.length > 0 && (
         <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
           <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
@@ -219,20 +230,53 @@ export default function EventDetail() {
           </h3>
           <div className="space-y-3">
             {shifts.map(shift => (
-              <div key={shift.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900">{shift.worker_name || 'Worker'}</p>
-                  <p className="text-xs text-gray-500 capitalize">{shift.role}</p>
+              <div key={shift.id} className="p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-900">{shift.worker_name || 'Worker'}</p>
+                    <p className="text-xs text-gray-500 capitalize">{shift.role}</p>
+                  </div>
+                  <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                    shift.status === 'on_the_way' ? 'bg-blue-100 text-blue-700' :
+                    shift.status === 'clocked_in' ? 'bg-indigo-100 text-indigo-700' :
+                    shift.status === 'accepted' ? 'bg-green-100 text-green-700' :
+                    ['clocked_out', 'completed'].includes(shift.status) ? 'bg-emerald-100 text-emerald-700' :
+                    shift.status === 'declined' ? 'bg-red-100 text-red-700' :
+                    'bg-yellow-100 text-yellow-700'
+                  }`}>
+                    {shift.status.replace(/_/g, ' ')}
+                  </span>
                 </div>
-                <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                  shift.status === 'accepted' ? 'bg-green-100 text-green-700' :
-                  shift.status === 'clocked_in' ? 'bg-blue-100 text-blue-700' :
-                  shift.status === 'completed' || shift.status === 'clocked_out' ? 'bg-emerald-100 text-emerald-700' :
-                  shift.status === 'declined' ? 'bg-red-100 text-red-700' :
-                  'bg-yellow-100 text-yellow-700'
-                }`}>
-                  {shift.status.replace(/_/g, ' ')}
-                </span>
+                {shift.status === 'on_the_way' && (
+                  <div className="mt-2 flex items-center gap-2 text-blue-600 text-xs">
+                    <Navigation size={14} />
+                    {shift.eta_minutes ? `ETA: ~${shift.eta_minutes} min` : 'On the way...'}
+                  </div>
+                )}
+                {shift.arrived_at && (
+                  <div className="mt-2 flex items-center gap-2 text-green-600 text-xs">
+                    <CheckCircle size={14} />
+                    Arrived at {new Date(shift.arrived_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </div>
+                )}
+                {shift.is_overtime && (
+                  <div className="mt-2 p-2 bg-amber-50 rounded border border-amber-200">
+                    <div className="flex items-center gap-1 text-amber-700 text-xs mb-1">
+                      <Clock size={14} />
+                      Overtime: {shift.overtime_hours?.toFixed(1)}h extra
+                    </div>
+                    {shift.overtime_approved === null && (
+                      <div className="flex gap-2 mt-1">
+                        <button onClick={() => handleOvertimeAction(shift.id, 'approve')}
+                          className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200">Approve</button>
+                        <button onClick={() => handleOvertimeAction(shift.id, 'dispute')}
+                          className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200">Dispute</button>
+                      </div>
+                    )}
+                    {shift.overtime_approved === true && <p className="text-xs text-green-600">Approved</p>}
+                    {shift.overtime_approved === false && <p className="text-xs text-red-600">Disputed</p>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -256,6 +300,38 @@ export default function EventDetail() {
               <span className="capitalize font-medium">{invoice.status}</span>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* V1: Action Buttons for completed events */}
+      {isCompleted && booking && (
+        <div className="space-y-3">
+          {!hasRated && (
+            <Link to={`/customer/events/${eventId}/rate`}
+              className="w-full bg-yellow-500 text-white py-3 rounded-lg font-semibold hover:bg-yellow-600 flex items-center justify-center gap-2">
+              <Star size={18} /> Rate Your Staff
+            </Link>
+          )}
+          <Link to={`/customer/events/${eventId}/tip`}
+            className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 flex items-center justify-center gap-2">
+            <Heart size={18} /> Tip Your Staff
+          </Link>
+        </div>
+      )}
+
+      {/* V1: Quick Actions */}
+      {booking && (
+        <div className="grid grid-cols-2 gap-3">
+          <Link to={`/chat?eventId=${eventId}`}
+            className="bg-white rounded-xl p-3 border border-gray-200 text-center hover:border-indigo-300 transition-colors">
+            <MessageCircle size={20} className="mx-auto text-indigo-500 mb-1" />
+            <p className="text-xs font-medium text-gray-700">Chat</p>
+          </Link>
+          <Link to={`/disputes?eventId=${eventId}`}
+            className="bg-white rounded-xl p-3 border border-gray-200 text-center hover:border-red-300 transition-colors">
+            <AlertTriangle size={20} className="mx-auto text-red-500 mb-1" />
+            <p className="text-xs font-medium text-gray-700">Report Issue</p>
+          </Link>
         </div>
       )}
     </div>

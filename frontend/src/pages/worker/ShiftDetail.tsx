@@ -4,7 +4,7 @@ import { api } from '../../services/api';
 import type { Shift, Event } from '../../types';
 import {
   ArrowLeft, MapPin, Calendar, Clock, DollarSign,
-  CheckCircle, Play, Square, Navigation,
+  CheckCircle, Play, Square, Navigation, Star, AlertTriangle,
 } from 'lucide-react';
 
 export default function ShiftDetail() {
@@ -138,6 +138,39 @@ export default function ShiftDetail() {
         )}
       </div>
 
+      {/* V1: GPS & Overtime Info */}
+      {(shift.eta_minutes || shift.arrived_at || shift.is_overtime) && (
+        <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm space-y-3">
+          <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <Navigation size={18} className="text-blue-500" />
+            Tracking
+          </h3>
+          {shift.eta_minutes && shift.status === 'on_the_way' && (
+            <div className="flex items-center gap-2 text-blue-600 text-sm">
+              <Navigation size={16} />
+              ETA: ~{shift.eta_minutes} minutes
+            </div>
+          )}
+          {shift.arrived_at && (
+            <div className="flex items-center gap-2 text-green-600 text-sm">
+              <CheckCircle size={16} />
+              Arrived at {new Date(shift.arrived_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </div>
+          )}
+          {shift.is_overtime && (
+            <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+              <div className="flex items-center gap-2 text-amber-700 text-sm">
+                <AlertTriangle size={16} />
+                Overtime: {shift.overtime_hours?.toFixed(1)}h extra
+              </div>
+              <p className="text-xs text-amber-600 mt-1">
+                Status: {shift.overtime_approved === true ? 'Approved' : shift.overtime_approved === false ? 'Disputed' : 'Pending approval'}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="space-y-3">
         {shift.status === 'assigned' && (
@@ -204,10 +237,20 @@ export default function ShiftDetail() {
         )}
 
         {['clocked_out', 'completed'].includes(shift.status) && (
-          <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-200">
-            <CheckCircle size={24} className="mx-auto text-emerald-500 mb-2" />
-            <p className="font-semibold text-emerald-700">Shift Complete</p>
-            <p className="text-sm text-emerald-600">Earnings: ${shift.pay_amount?.toFixed(2)}</p>
+          <div className="space-y-3">
+            <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-200">
+              <CheckCircle size={24} className="mx-auto text-emerald-500 mb-2" />
+              <p className="font-semibold text-emerald-700">Shift Complete</p>
+              <p className="text-sm text-emerald-600">Earnings: ${shift.pay_amount?.toFixed(2)}</p>
+            </div>
+            {event && (
+              <button
+                onClick={() => navigate(`/worker/shifts/${shiftId}/rate`)}
+                className="w-full bg-yellow-500 text-white py-3 rounded-lg font-semibold hover:bg-yellow-600 flex items-center justify-center gap-2"
+              >
+                <Star size={18} /> Rate Customer
+              </button>
+            )}
           </div>
         )}
       </div>

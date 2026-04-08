@@ -135,6 +135,13 @@ export interface Shift {
   planned_end?: string;
   hours_worked?: number;
   pay_amount?: number;
+  is_overtime: boolean;
+  overtime_hours: number;
+  overtime_approved?: boolean | null;
+  worker_latitude?: number;
+  worker_longitude?: number;
+  eta_minutes?: number;
+  arrived_at?: string;
   created_at: string;
   event_name?: string;
   worker_name?: string;
@@ -160,7 +167,9 @@ export interface Payout {
   shift_id: string;
   event_id: string;
   amount: number;
+  tip_amount: number;
   status: string;
+  payout_method?: string;
   paid_at?: string;
   created_at: string;
   event_name?: string;
@@ -210,6 +219,11 @@ export interface AdminStats {
 export interface Earnings {
   total_earned: number;
   total_pending: number;
+  total_tips: number;
+  weekly_earnings: number;
+  monthly_earnings: number;
+  weekly_tips: number;
+  monthly_tips: number;
   payouts: {
     id: string;
     amount: number;
@@ -219,4 +233,70 @@ export interface Earnings {
     paid_at?: string;
   }[];
   completed_shifts_count: number;
+}
+
+// V1 Types
+
+export interface ChatRoom {
+  id: string;
+  event_id?: string;
+  room_type: string;
+  name?: string;
+  created_by: string;
+  is_active: boolean;
+  created_at: string;
+  members: string[];
+  last_message?: string;
+  unread_count: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  room_id: string;
+  sender_id: string;
+  message: string;
+  is_quick_message: boolean;
+  is_read: boolean;
+  created_at: string;
+  sender_name?: string;
+}
+
+export interface Tip {
+  id: string;
+  event_id: string;
+  booking_id: string;
+  from_customer_id: string;
+  to_worker_id?: string;
+  amount: number;
+  split_type: string;
+  status: string;
+  created_at: string;
+}
+
+export interface Dispute {
+  id: string;
+  event_id: string;
+  booking_id?: string;
+  filed_by: string;
+  filed_against?: string;
+  dispute_type: string;
+  description: string;
+  status: string;
+  resolution?: string;
+  resolved_by?: string;
+  refund_amount?: number;
+  payout_adjustment?: number;
+  created_at: string;
+  filed_by_name?: string;
+  filed_against_name?: string;
+}
+
+export interface CancellationPolicy {
+  id: string;
+  policy_type: string;
+  hours_before_free_cancel: number;
+  late_cancel_fee_percent: number;
+  no_show_fee_percent: number;
+  worker_cancel_rating_penalty: number;
+  worker_cancel_suspension_hours: number;
 }

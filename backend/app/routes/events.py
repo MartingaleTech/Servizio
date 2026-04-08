@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
-from app.models.event import Booking, Event, Invoice, Quote, Shift, PricingRule, Payout, Notification
+from app.models.event import Booking, ChatRoom, ChatRoomMember, Event, Invoice, Quote, Shift, PricingRule, Payout, Notification
 from app.models.schemas import (
     BookingCreate,
     BookingResponse,
@@ -13,7 +13,9 @@ from app.models.schemas import (
     EventResponse,
     EventUpdate,
     InvoiceResponse,
+    OvertimeAction,
     QuoteResponse,
+    ShiftLocationUpdate,
     ShiftResponse,
 )
 from app.models.user import User, WorkerProfile
@@ -327,6 +329,31 @@ def _match_workers(db: Session, event: Event, booking: Booking):
         event.status = "partially_staffed"
         booking.status = "partially_staffed"
 
+    # V1: Create event chat room when workers are assigned
+    if total_assigned > 0:
+        existing_room = db.query(ChatRoom).filter(
+            ChatRoom.event_id == event.id,
+            ChatRoom.room_type == "event",
+        ).first()
+        if not existing_room:
+            room = ChatRoom(
+                event_id=event.id,
+                room_type="event",
+                name=f"Event: {event.name}",
+                created_by=event.customer_id,
+            )
+            db.add(room)
+            db.flush()
+            # Add customer
+            db.add(ChatRoomMember(room_id=room.id, user_id=event.customer_id))
+            # Add assigned workers
+            assigned_shifts = db.query(Shift).filter(Shift.event_id == event.id).all()
+            added_workers = set()
+            for s in assigned_shifts:
+                if s.worker_id not in added_workers:
+                    db.add(ChatRoomMember(room_id=room.id, user_id=s.worker_id))
+                    added_workers.add(s.worker_id)
+
 
 @router.get("/{event_id}/booking", response_model=Optional[BookingResponse])
 def get_event_booking(
@@ -388,3 +415,104 @@ def get_event_invoice(
     resp = InvoiceResponse.model_validate(invoice)
     resp.event_name = event.name if event else None
     return resp
+
+
+# ---- V1: GPS Location Update ----
+
+@router.put("/{event_id}/shifts/{shift_id}/location", response_model=ShiftResponse)
+def update_shift_location(
+    event_id: str,
+    shift_id: str,
+    data: ShiftLocationUpdate,
+    current_user: User = Depends(require_role(["worker"])),
+    db: Session = Depends(get_db),
+):
+    shift = db.query(Shift).filter(
+        Shift.id == shift_id,
+        Shift.event_id == event_id,
+        Shift.worker_id == current_user.id,
+    ).first()
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+
+    shift.worker_latitude = data.latitude
+    shift.worker_longitude = data.longitude
+    if data.eta_minutes is not None:
+        shift.eta_minutes = data.eta_minutes
+
+    db.commit()
+    db.refresh(shift)
+
+    event = db.query(Event).filter(Event.id == event_id).first()
+    resp = ShiftResponse.model_validate(shift)
+    resp.event_name = event.name if event else None
+    resp.worker_name = current_user.full_name
+    return resp
+
+
+# ---- V1: Overtime Approval ----
+
+@router.put("/{event_id}/shifts/{shift_id}/overtime", response_model=ShiftResponse)
+def handle_overtime(
+    event_id: str,
+    shift_id: str,
+    data: OvertimeAction,
+    current_user: User = Depends(require_role(["customer"])),
+    db: Session = Depends(get_db),
+):
+    event = db.query(Event).filter(Event.id == event_id, Event.customer_id == current_user.id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    shift = db.query(Shift).filter(Shift.id == shift_id, Shift.event_id == event_id).first()
+    if not shift:
+        raise HTTPException(status_code=404, detail="Shift not found")
+    if not shift.is_overtime:
+        raise HTTPException(status_code=400, detail="This shift has no overtime")
+
+    if data.action == "approve":
+        shift.overtime_approved = True
+    elif data.action == "dispute":
+        shift.overtime_approved = False
+    else:
+        raise HTTPException(status_code=400, detail="Action must be 'approve' or 'dispute'")
+
+    worker = db.query(User).filter(User.id == shift.worker_id).first()
+    notif = Notification(
+        user_id=shift.worker_id,
+        title="Overtime Update",
+        message=f"Your overtime for '{event.name}' has been {'approved' if shift.overtime_approved else 'disputed'}.",
+        notification_type="shift",
+        reference_id=shift.id,
+    )
+    db.add(notif)
+
+    db.commit()
+    db.refresh(shift)
+
+    resp = ShiftResponse.model_validate(shift)
+    resp.event_name = event.name
+    resp.worker_name = worker.full_name if worker else None
+    return resp
+
+
+# ---- V1: Customer bookings list ----
+
+@router.get("/bookings", response_model=list[BookingResponse])
+def list_my_bookings(
+    current_user: User = Depends(require_role(["customer"])),
+    db: Session = Depends(get_db),
+):
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.customer_id == current_user.id)
+        .order_by(Booking.created_at.desc())
+        .all()
+    )
+    results = []
+    for b in bookings:
+        event = db.query(Event).filter(Event.id == b.event_id).first()
+        resp = BookingResponse.model_validate(b)
+        resp.event_name = event.name if event else None
+        results.append(resp)
+    return results
