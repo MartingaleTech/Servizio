@@ -240,7 +240,8 @@ def shift_action(
         # V1: Time window restriction - can only clock in within 30 minutes of planned start
         now = datetime.now(timezone.utc)
         if shift.planned_start:
-            minutes_before = (shift.planned_start - now).total_seconds() / 60
+            planned_start = shift.planned_start.replace(tzinfo=timezone.utc) if shift.planned_start.tzinfo is None else shift.planned_start
+            minutes_before = (planned_start - now).total_seconds() / 60
             if minutes_before > 30:
                 raise HTTPException(status_code=400, detail=f"Too early to clock in. You can clock in starting 30 minutes before your shift.")
         shift.status = "clocked_in"
@@ -251,11 +252,14 @@ def shift_action(
         shift.status = "clocked_out"
         shift.clock_out_time = datetime.now(timezone.utc)
         if shift.clock_in_time:
-            delta = shift.clock_out_time - shift.clock_in_time
+            clock_in = shift.clock_in_time.replace(tzinfo=timezone.utc) if shift.clock_in_time.tzinfo is None else shift.clock_in_time
+            delta = shift.clock_out_time - clock_in
             shift.hours_worked = round(delta.total_seconds() / 3600, 2)
             # V1: Overtime detection
             if shift.planned_end:
-                planned_hours = (shift.planned_end - shift.planned_start).total_seconds() / 3600 if shift.planned_start else 0
+                planned_end = shift.planned_end.replace(tzinfo=timezone.utc) if shift.planned_end.tzinfo is None else shift.planned_end
+                planned_start = shift.planned_start.replace(tzinfo=timezone.utc) if shift.planned_start and shift.planned_start.tzinfo is None else shift.planned_start
+                planned_hours = (planned_end - planned_start).total_seconds() / 3600 if planned_start else 0
                 if shift.hours_worked > planned_hours + 0.25:  # 15 min grace
                     shift.is_overtime = True
                     shift.overtime_hours = round(shift.hours_worked - planned_hours, 2)

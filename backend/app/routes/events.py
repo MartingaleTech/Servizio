@@ -88,6 +88,26 @@ def list_my_events(
     return results
 
 
+@router.get("/bookings", response_model=list[BookingResponse])
+def list_my_bookings(
+    current_user: User = Depends(require_role(["customer"])),
+    db: Session = Depends(get_db),
+):
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.customer_id == current_user.id)
+        .order_by(Booking.created_at.desc())
+        .all()
+    )
+    results = []
+    for b in bookings:
+        event = db.query(Event).filter(Event.id == b.event_id).first()
+        resp = BookingResponse.model_validate(b)
+        resp.event_name = event.name if event else None
+        results.append(resp)
+    return results
+
+
 @router.get("/{event_id}", response_model=EventResponse)
 def get_event(
     event_id: str,
@@ -162,8 +182,12 @@ def get_quote(
     bartender_cost = event.bartenders_needed * hours * pricing["bartender"]["hourly_rate"]
     cleaner_cost = event.cleaners_needed * hours * pricing["cleaner"]["hourly_rate"]
     subtotal = server_cost + bartender_cost + cleaner_cost
-    avg_fee_pct = pricing["server"]["platform_fee_percent"]
-    platform_fee = round(subtotal * avg_fee_pct / 100, 2)
+    weighted_fee_pct = (
+        server_cost * pricing["server"]["platform_fee_percent"] +
+        bartender_cost * pricing["bartender"]["platform_fee_percent"] +
+        cleaner_cost * pricing["cleaner"]["platform_fee_percent"]
+    ) / subtotal if subtotal > 0 else pricing["server"]["platform_fee_percent"]
+    platform_fee = round(subtotal * weighted_fee_pct / 100, 2)
     total = round(subtotal + platform_fee, 2)
 
     existing_quote = db.query(Quote).filter(Quote.event_id == event_id, Quote.is_accepted == False).first()
@@ -494,25 +518,3 @@ def handle_overtime(
     resp.event_name = event.name
     resp.worker_name = worker.full_name if worker else None
     return resp
-
-
-# ---- V1: Customer bookings list ----
-
-@router.get("/bookings", response_model=list[BookingResponse])
-def list_my_bookings(
-    current_user: User = Depends(require_role(["customer"])),
-    db: Session = Depends(get_db),
-):
-    bookings = (
-        db.query(Booking)
-        .filter(Booking.customer_id == current_user.id)
-        .order_by(Booking.created_at.desc())
-        .all()
-    )
-    results = []
-    for b in bookings:
-        event = db.query(Event).filter(Event.id == b.event_id).first()
-        resp = BookingResponse.model_validate(b)
-        resp.event_name = event.name if event else None
-        results.append(resp)
-    return results

@@ -85,26 +85,35 @@ def list_my_disputes(
     return results
 
 
-@router.get("/{dispute_id}", response_model=DisputeResponse)
-def get_dispute(
-    dispute_id: str,
+# ---- Cancellation Policies ----
+
+@router.get("/policies", response_model=list[CancellationPolicyResponse])
+def list_policies(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
-    if not dispute:
-        raise HTTPException(status_code=404, detail="Dispute not found")
+    policies = db.query(CancellationPolicy).all()
+    return [CancellationPolicyResponse.model_validate(p) for p in policies]
 
-    if current_user.role != "admin" and dispute.filed_by != current_user.id and dispute.filed_against != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
 
-    resp = DisputeResponse.model_validate(dispute)
-    filer = db.query(User).filter(User.id == dispute.filed_by).first()
-    resp.filed_by_name = filer.full_name if filer else None
-    if dispute.filed_against:
-        target = db.query(User).filter(User.id == dispute.filed_against).first()
-        resp.filed_against_name = target.full_name if target else None
-    return resp
+@router.put("/policies/{policy_type}", response_model=CancellationPolicyResponse)
+def update_policy(
+    policy_type: str,
+    data: CancellationPolicyUpdate,
+    current_user: User = Depends(require_role(["admin"])),
+    db: Session = Depends(get_db),
+):
+    policy = db.query(CancellationPolicy).filter(CancellationPolicy.policy_type == policy_type).first()
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(policy, key, value)
+
+    db.commit()
+    db.refresh(policy)
+    return CancellationPolicyResponse.model_validate(policy)
 
 
 # ---- Admin Dispute Management ----
@@ -129,6 +138,28 @@ def list_all_disputes(
             resp.filed_against_name = target.full_name if target else None
         results.append(resp)
     return results
+
+
+@router.get("/{dispute_id}", response_model=DisputeResponse)
+def get_dispute(
+    dispute_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    dispute = db.query(Dispute).filter(Dispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Dispute not found")
+
+    if current_user.role != "admin" and dispute.filed_by != current_user.id and dispute.filed_against != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    resp = DisputeResponse.model_validate(dispute)
+    filer = db.query(User).filter(User.id == dispute.filed_by).first()
+    resp.filed_by_name = filer.full_name if filer else None
+    if dispute.filed_against:
+        target = db.query(User).filter(User.id == dispute.filed_against).first()
+        resp.filed_against_name = target.full_name if target else None
+    return resp
 
 
 @router.put("/{dispute_id}/resolve", response_model=DisputeResponse)
@@ -170,34 +201,3 @@ def resolve_dispute(
         target = db.query(User).filter(User.id == dispute.filed_against).first()
         resp.filed_against_name = target.full_name if target else None
     return resp
-
-
-# ---- Cancellation Policies ----
-
-@router.get("/policies", response_model=list[CancellationPolicyResponse])
-def list_policies(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    policies = db.query(CancellationPolicy).all()
-    return [CancellationPolicyResponse.model_validate(p) for p in policies]
-
-
-@router.put("/policies/{policy_type}", response_model=CancellationPolicyResponse)
-def update_policy(
-    policy_type: str,
-    data: CancellationPolicyUpdate,
-    current_user: User = Depends(require_role(["admin"])),
-    db: Session = Depends(get_db),
-):
-    policy = db.query(CancellationPolicy).filter(CancellationPolicy.policy_type == policy_type).first()
-    if not policy:
-        raise HTTPException(status_code=404, detail="Policy not found")
-
-    update_data = data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(policy, key, value)
-
-    db.commit()
-    db.refresh(policy)
-    return CancellationPolicyResponse.model_validate(policy)
