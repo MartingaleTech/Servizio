@@ -33,6 +33,8 @@ def create_rating(
 
     if current_user.role == "customer":
         rating_type = "customer_to_worker"
+        if event.customer_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to rate workers for this event")
         shift = db.query(Shift).filter(
             Shift.event_id == data.event_id,
             Shift.worker_id == data.to_user_id,
@@ -43,6 +45,12 @@ def create_rating(
         rating_type = "worker_to_customer"
         if event.customer_id != data.to_user_id:
             raise HTTPException(status_code=400, detail="Can only rate the event host")
+        shift = db.query(Shift).filter(
+            Shift.event_id == data.event_id,
+            Shift.worker_id == current_user.id,
+        ).first()
+        if not shift:
+            raise HTTPException(status_code=403, detail="You were not assigned to this event")
 
     rating = Rating(
         event_id=data.event_id,

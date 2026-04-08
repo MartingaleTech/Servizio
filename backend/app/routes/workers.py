@@ -18,7 +18,7 @@ from app.models.schemas import (
     WorkerProfileUpdate,
 )
 from app.models.user import IDVerification, User, WorkerAvailability, WorkerProfile
-from app.models.event import Event, Payout, Shift
+from app.models.event import Event, Payout, Shift, Tip
 
 router = APIRouter(prefix="/api/workers", tags=["workers"])
 
@@ -237,16 +237,36 @@ def shift_action(
     elif data.action == "clock_in":
         if shift.status not in ("accepted", "on_the_way"):
             raise HTTPException(status_code=400, detail="Cannot clock in for this shift")
+        # V1: Time window restriction - can only clock in within 30 minutes of planned start
+        now = datetime.now(timezone.utc)
+        if shift.planned_start:
+            planned_start = shift.planned_start.replace(tzinfo=timezone.utc) if shift.planned_start.tzinfo is None else shift.planned_start
+            minutes_before = (planned_start - now).total_seconds() / 60
+            if minutes_before > 30:
+                raise HTTPException(status_code=400, detail=f"Too early to clock in. You can clock in starting 30 minutes before your shift.")
         shift.status = "clocked_in"
-        shift.clock_in_time = datetime.now(timezone.utc)
+        shift.clock_in_time = now
     elif data.action == "clock_out":
         if shift.status != "clocked_in":
             raise HTTPException(status_code=400, detail="Must clock in first")
         shift.status = "clocked_out"
         shift.clock_out_time = datetime.now(timezone.utc)
         if shift.clock_in_time:
-            delta = shift.clock_out_time - shift.clock_in_time
+            clock_in = shift.clock_in_time.replace(tzinfo=timezone.utc) if shift.clock_in_time.tzinfo is None else shift.clock_in_time
+            delta = shift.clock_out_time - clock_in
             shift.hours_worked = round(delta.total_seconds() / 3600, 2)
+            # V1: Overtime detection
+            if shift.planned_end and shift.planned_start:
+                planned_end = shift.planned_end.replace(tzinfo=timezone.utc) if shift.planned_end.tzinfo is None else shift.planned_end
+                planned_start = shift.planned_start.replace(tzinfo=timezone.utc) if shift.planned_start.tzinfo is None else shift.planned_start
+                planned_hours = (planned_end - planned_start).total_seconds() / 3600
+                if shift.hours_worked > planned_hours + 0.25:  # 15 min grace
+                    shift.is_overtime = True
+                    shift.overtime_hours = round(shift.hours_worked - planned_hours, 2)
+    elif data.action == "arrived":
+        if shift.status != "on_the_way":
+            raise HTTPException(status_code=400, detail="Must be on the way first")
+        shift.arrived_at = datetime.now(timezone.utc)
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {data.action}")
 
@@ -301,9 +321,47 @@ def get_earnings(
             "paid_at": p.paid_at.isoformat() if p.paid_at else None,
         })
 
+    # V1: Enhanced earnings with tips and time breakdown
+    tips = (
+        db.query(Tip)
+        .filter(Tip.to_worker_id == current_user.id)
+        .all()
+    )
+    total_tips = sum(t.amount for t in tips)
+
+    # Weekly/monthly breakdown
+    now = datetime.now(timezone.utc)
+    week_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Approximate: go back 7 days for weekly
+    from datetime import timedelta
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+
+    weekly_payouts = sum(
+        p.amount for p in payouts
+        if p.created_at and (p.created_at.replace(tzinfo=timezone.utc) if p.created_at.tzinfo is None else p.created_at) >= week_ago
+    )
+    monthly_payouts = sum(
+        p.amount for p in payouts
+        if p.created_at and (p.created_at.replace(tzinfo=timezone.utc) if p.created_at.tzinfo is None else p.created_at) >= month_ago
+    )
+    weekly_tips = sum(
+        t.amount for t in tips
+        if t.created_at and (t.created_at.replace(tzinfo=timezone.utc) if t.created_at.tzinfo is None else t.created_at) >= week_ago
+    )
+    monthly_tips = sum(
+        t.amount for t in tips
+        if t.created_at and (t.created_at.replace(tzinfo=timezone.utc) if t.created_at.tzinfo is None else t.created_at) >= month_ago
+    )
+
     return {
         "total_earned": total_earned,
         "total_pending": total_pending,
+        "total_tips": total_tips,
+        "weekly_earnings": weekly_payouts,
+        "monthly_earnings": monthly_payouts,
+        "weekly_tips": weekly_tips,
+        "monthly_tips": monthly_tips,
         "payouts": payout_list,
         "completed_shifts_count": len(completed_shifts),
     }

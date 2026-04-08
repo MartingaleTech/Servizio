@@ -42,6 +42,10 @@ class WorkerProfile(Base):
     total_reviews = Column(Integer, default=0)
     total_events_completed = Column(Integer, default=0)
     verification_status = Column(String, default="unverified")  # unverified, pending, approved, rejected
+    # V1: Enhanced profile fields
+    skills_tags = Column(String, nullable=True)  # comma-separated: "tray_service,buffet_management,kids_events,weddings"
+    certifications = Column(String, nullable=True)  # comma-separated: "food_handling,alcohol_service"
+    event_types_worked = Column(String, nullable=True)  # comma-separated event types
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

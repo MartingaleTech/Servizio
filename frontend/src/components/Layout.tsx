@@ -14,6 +14,8 @@ import {
   BarChart3,
   Clock,
   Shield,
+  MessageCircle,
+  AlertTriangle,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -33,6 +35,7 @@ export default function Layout({ children }: LayoutProps) {
   const customerNav = [
     { path: '/customer/dashboard', icon: Home, label: 'Home' },
     { path: '/customer/events', icon: Calendar, label: 'Events' },
+    { path: '/chat', icon: MessageCircle, label: 'Chat' },
     { path: '/customer/bookings', icon: Briefcase, label: 'Bookings' },
     { path: '/customer/profile', icon: User, label: 'Profile' },
   ];
@@ -40,6 +43,7 @@ export default function Layout({ children }: LayoutProps) {
   const workerNav = [
     { path: '/worker/dashboard', icon: Home, label: 'Home' },
     { path: '/worker/shifts', icon: Clock, label: 'Shifts' },
+    { path: '/chat', icon: MessageCircle, label: 'Chat' },
     { path: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
     { path: '/worker/profile', icon: User, label: 'Profile' },
   ];
@@ -50,6 +54,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/admin/verifications', icon: Shield, label: 'Verify' },
     { path: '/admin/events', icon: Calendar, label: 'Events' },
     { path: '/admin/payouts', icon: DollarSign, label: 'Payouts' },
+    { path: '/admin/disputes', icon: AlertTriangle, label: 'Disputes' },
     { path: '/admin/pricing', icon: Settings, label: 'Pricing' },
   ];
 

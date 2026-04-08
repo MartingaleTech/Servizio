@@ -7,7 +7,7 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.security import require_role
-from app.models.event import Booking, Event, Invoice, Payout, PricingRule, Shift, Notification
+from app.models.event import Booking, ChatRoom, ChatRoomMember, Event, Invoice, Payout, PricingRule, Shift, Notification
 from app.models.schemas import (
     AdminStats,
     BookingResponse,
@@ -289,6 +289,29 @@ def assign_worker(
     )
     db.add(notification)
 
+    # Add worker to event chat room, creating one if it doesn't exist
+    chat_room = db.query(ChatRoom).filter(
+        ChatRoom.event_id == event_id,
+        ChatRoom.room_type == "event",
+    ).first()
+    if not chat_room:
+        chat_room = ChatRoom(
+            event_id=event_id,
+            room_type="event",
+            name=f"Event: {event.name}",
+            created_by=event.customer_id,
+        )
+        db.add(chat_room)
+        db.flush()
+        # Add customer as first member
+        db.add(ChatRoomMember(room_id=chat_room.id, user_id=event.customer_id))
+    existing_member = db.query(ChatRoomMember).filter(
+        ChatRoomMember.room_id == chat_room.id,
+        ChatRoomMember.user_id == data.worker_id,
+    ).first()
+    if not existing_member:
+        db.add(ChatRoomMember(room_id=chat_room.id, user_id=data.worker_id))
+
     db.commit()
     db.refresh(shift)
     resp = ShiftResponse.model_validate(shift)
@@ -380,17 +403,19 @@ def generate_payouts(
 
     booking = db.query(Booking).filter(Booking.event_id == event_id).first()
     if booking:
-        invoice = Invoice(
-            booking_id=booking.id,
-            event_id=event_id,
-            customer_id=booking.customer_id,
-            amount=booking.total_amount - booking.platform_fee,
-            platform_fee=booking.platform_fee,
-            total=booking.total_amount,
-            status="paid",
-            paid_at=datetime.now(timezone.utc),
-        )
-        db.add(invoice)
+        existing_invoice = db.query(Invoice).filter(Invoice.booking_id == booking.id).first()
+        if not existing_invoice:
+            invoice = Invoice(
+                booking_id=booking.id,
+                event_id=event_id,
+                customer_id=booking.customer_id,
+                amount=booking.total_amount - booking.platform_fee,
+                platform_fee=booking.platform_fee,
+                total=booking.total_amount,
+                status="paid",
+                paid_at=datetime.now(timezone.utc),
+            )
+            db.add(invoice)
         booking.status = "completed"
 
     db.commit()

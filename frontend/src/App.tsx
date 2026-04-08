@@ -23,8 +23,14 @@ import AdminVerifications from './pages/admin/AdminVerifications';
 import AdminEvents from './pages/admin/AdminEvents';
 import AdminPayouts from './pages/admin/AdminPayouts';
 import AdminPricing from './pages/admin/AdminPricing';
+import AdminDisputes from './pages/admin/AdminDisputes';
 
 import NotificationsPage from './pages/NotificationsPage';
+import ChatPage from './pages/ChatPage';
+import DisputesPage from './pages/DisputesPage';
+import RateEvent from './pages/customer/RateEvent';
+import TipEvent from './pages/customer/TipEvent';
+import WorkerRateEvent from './pages/worker/WorkerRateEvent';
 
 function RoleRedirect() {
   const { user } = useAuth();
@@ -76,6 +82,8 @@ function App() {
           <Route path="/customer/events/new" element={<ProtectedRoute allowedRoles={['customer']}><CreateEvent /></ProtectedRoute>} />
           <Route path="/customer/events/:eventId" element={<ProtectedRoute allowedRoles={['customer']}><EventDetail /></ProtectedRoute>} />
           <Route path="/customer/bookings" element={<ProtectedRoute allowedRoles={['customer']}><CustomerBookings /></ProtectedRoute>} />
+          <Route path="/customer/events/:eventId/rate" element={<ProtectedRoute allowedRoles={['customer']}><RateEvent /></ProtectedRoute>} />
+          <Route path="/customer/events/:eventId/tip" element={<ProtectedRoute allowedRoles={['customer']}><TipEvent /></ProtectedRoute>} />
           <Route path="/customer/profile" element={<ProtectedRoute allowedRoles={['customer']}><CustomerProfile /></ProtectedRoute>} />
 
           {/* Worker routes */}
@@ -83,6 +91,7 @@ function App() {
           <Route path="/worker/shifts" element={<ProtectedRoute allowedRoles={['worker']}><WorkerShifts /></ProtectedRoute>} />
           <Route path="/worker/shifts/:shiftId" element={<ProtectedRoute allowedRoles={['worker']}><ShiftDetail /></ProtectedRoute>} />
           <Route path="/worker/earnings" element={<ProtectedRoute allowedRoles={['worker']}><WorkerEarnings /></ProtectedRoute>} />
+          <Route path="/worker/shifts/:shiftId/rate" element={<ProtectedRoute allowedRoles={['worker']}><WorkerRateEvent /></ProtectedRoute>} />
           <Route path="/worker/profile" element={<ProtectedRoute allowedRoles={['worker']}><WorkerProfile /></ProtectedRoute>} />
 
           {/* Admin routes */}
@@ -92,9 +101,12 @@ function App() {
           <Route path="/admin/events" element={<ProtectedRoute allowedRoles={['admin']}><AdminEvents /></ProtectedRoute>} />
           <Route path="/admin/payouts" element={<ProtectedRoute allowedRoles={['admin']}><AdminPayouts /></ProtectedRoute>} />
           <Route path="/admin/pricing" element={<ProtectedRoute allowedRoles={['admin']}><AdminPricing /></ProtectedRoute>} />
+          <Route path="/admin/disputes" element={<ProtectedRoute allowedRoles={['admin']}><AdminDisputes /></ProtectedRoute>} />
 
           {/* Shared routes */}
           <Route path="/notifications" element={<ProtectedRoute><NotificationsPage /></ProtectedRoute>} />
+          <Route path="/chat" element={<ProtectedRoute><ChatPage /></ProtectedRoute>} />
+          <Route path="/disputes" element={<ProtectedRoute><DisputesPage /></ProtectedRoute>} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" />} />

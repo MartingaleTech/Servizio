@@ -29,6 +29,9 @@ export default function WorkerProfilePage() {
   const [languages, setLanguages] = useState('');
   const [maxDistance, setMaxDistance] = useState(20);
   const [acceptingJobs, setAcceptingJobs] = useState(true);
+  // V1: Enhanced profile fields
+  const [skillsTags, setSkillsTags] = useState<string[]>([]);
+  const [certifications, setCertifications] = useState<string[]>([]);
 
   // Verification form
   const [idFront, setIdFront] = useState('');
@@ -56,6 +59,8 @@ export default function WorkerProfilePage() {
         setLanguages(p.languages || '');
         setMaxDistance(p.max_travel_distance_km);
         setAcceptingJobs(p.is_accepting_jobs);
+        setSkillsTags(p.skills_tags ? p.skills_tags.split(',').filter(Boolean) : []);
+        setCertifications(p.certifications ? p.certifications.split(',').filter(Boolean) : []);
       }
       setVerification(v);
       setAvailabilities(a);
@@ -75,6 +80,8 @@ export default function WorkerProfilePage() {
         languages,
         max_travel_distance_km: maxDistance,
         is_accepting_jobs: acceptingJobs,
+        skills_tags: skillsTags.join(','),
+        certifications: certifications.join(','),
       });
       setProfile(updated);
       setMessage('Profile saved!');
@@ -248,6 +255,48 @@ export default function WorkerProfilePage() {
                     }`}
                   >
                     {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* V1: Skills Tags */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Skills</label>
+              <div className="flex flex-wrap gap-2">
+                {['tray_service', 'buffet_management', 'kids_events', 'weddings', 'corporate', 'cocktail_mixing', 'fine_dining'].map(skill => (
+                  <button
+                    key={skill}
+                    type="button"
+                    onClick={() => setSkillsTags(prev =>
+                      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+                    )}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                      skillsTags.includes(skill) ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {skill.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* V1: Certifications */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Certifications</label>
+              <div className="flex flex-wrap gap-2">
+                {['food_handling', 'alcohol_service', 'first_aid', 'hygiene_safety'].map(cert => (
+                  <button
+                    key={cert}
+                    type="button"
+                    onClick={() => setCertifications(prev =>
+                      prev.includes(cert) ? prev.filter(c => c !== cert) : [...prev, cert]
+                    )}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                      certifications.includes(cert) ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {cert.replace(/_/g, ' ')}
                   </button>
                 ))}
               </div>

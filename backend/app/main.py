@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.database import Base, engine
-from app.routes import auth, workers, events, admin, notifications, ratings
+from app.routes import auth, workers, events, admin, notifications, ratings, chat, disputes, tips
 
 # Create all tables
 Base.metadata.create_all(bind=engine)
@@ -25,6 +25,9 @@ app.include_router(events.router)
 app.include_router(admin.router)
 app.include_router(notifications.router)
 app.include_router(ratings.router)
+app.include_router(chat.router)
+app.include_router(disputes.router)
+app.include_router(tips.router)
 
 
 @app.get("/healthz")
@@ -38,7 +41,7 @@ def seed_admin():
     from app.core.database import SessionLocal
     from app.core.security import get_password_hash
     from app.models.user import User
-    from app.models.event import PricingRule
+    from app.models.event import PricingRule, CancellationPolicy
 
     db = SessionLocal()
     try:
@@ -58,6 +61,27 @@ def seed_admin():
             existing = db.query(PricingRule).filter(PricingRule.role == role).first()
             if not existing:
                 db.add(PricingRule(role=role, hourly_rate=rate, platform_fee_percent=15.0))
+
+        # Seed cancellation policies
+        for ptype in ["customer", "worker"]:
+            existing_policy = db.query(CancellationPolicy).filter(CancellationPolicy.policy_type == ptype).first()
+            if not existing_policy:
+                if ptype == "customer":
+                    db.add(CancellationPolicy(
+                        policy_type="customer",
+                        hours_before_free_cancel=48,
+                        late_cancel_fee_percent=50.0,
+                        no_show_fee_percent=100.0,
+                    ))
+                else:
+                    db.add(CancellationPolicy(
+                        policy_type="worker",
+                        hours_before_free_cancel=24,
+                        late_cancel_fee_percent=0.0,
+                        no_show_fee_percent=0.0,
+                        worker_cancel_rating_penalty=0.5,
+                        worker_cancel_suspension_hours=48,
+                    ))
 
         db.commit()
     finally:
