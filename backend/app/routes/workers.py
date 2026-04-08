@@ -256,10 +256,10 @@ def shift_action(
             delta = shift.clock_out_time - clock_in
             shift.hours_worked = round(delta.total_seconds() / 3600, 2)
             # V1: Overtime detection
-            if shift.planned_end:
+            if shift.planned_end and shift.planned_start:
                 planned_end = shift.planned_end.replace(tzinfo=timezone.utc) if shift.planned_end.tzinfo is None else shift.planned_end
-                planned_start = shift.planned_start.replace(tzinfo=timezone.utc) if shift.planned_start and shift.planned_start.tzinfo is None else shift.planned_start
-                planned_hours = (planned_end - planned_start).total_seconds() / 3600 if planned_start else 0
+                planned_start = shift.planned_start.replace(tzinfo=timezone.utc) if shift.planned_start.tzinfo is None else shift.planned_start
+                planned_hours = (planned_end - planned_start).total_seconds() / 3600
                 if shift.hours_worked > planned_hours + 0.25:  # 15 min grace
                     shift.is_overtime = True
                     shift.overtime_hours = round(shift.hours_worked - planned_hours, 2)
@@ -339,19 +339,19 @@ def get_earnings(
 
     weekly_payouts = sum(
         p.amount for p in payouts
-        if p.created_at and p.created_at.replace(tzinfo=timezone.utc) >= week_ago
+        if p.created_at and (p.created_at.replace(tzinfo=timezone.utc) if p.created_at.tzinfo is None else p.created_at) >= week_ago
     )
     monthly_payouts = sum(
         p.amount for p in payouts
-        if p.created_at and p.created_at.replace(tzinfo=timezone.utc) >= month_ago
+        if p.created_at and (p.created_at.replace(tzinfo=timezone.utc) if p.created_at.tzinfo is None else p.created_at) >= month_ago
     )
     weekly_tips = sum(
         t.amount for t in tips
-        if t.created_at and t.created_at.replace(tzinfo=timezone.utc) >= week_ago
+        if t.created_at and (t.created_at.replace(tzinfo=timezone.utc) if t.created_at.tzinfo is None else t.created_at) >= week_ago
     )
     monthly_tips = sum(
         t.amount for t in tips
-        if t.created_at and t.created_at.replace(tzinfo=timezone.utc) >= month_ago
+        if t.created_at and (t.created_at.replace(tzinfo=timezone.utc) if t.created_at.tzinfo is None else t.created_at) >= month_ago
     )
 
     return {

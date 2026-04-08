@@ -46,6 +46,8 @@ def create_tip(
         raise HTTPException(status_code=400, detail="No completed shifts to tip")
 
     tips = []
+    if data.amount <= 0:
+        raise HTTPException(status_code=400, detail="Tip amount must be positive")
     if data.split_type == "even":
         per_worker = round(data.amount / len(shifts), 2)
         for shift in shifts:
