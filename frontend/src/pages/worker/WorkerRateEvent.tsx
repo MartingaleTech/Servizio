@@ -29,15 +29,6 @@ export default function WorkerRateEvent() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  useEffect(() => {
-    if (shiftId) {
-      // Get shift details to find event
-      api.get<{ event_id: string; event_name?: string }>(`/api/workers/shifts`).then(shifts => {
-        // shifts is an array, find the one
-      }).catch(() => {});
-    }
-  }, [shiftId]);
-
   // Load shift data from worker shifts
   useEffect(() => {
     const loadData = async () => {

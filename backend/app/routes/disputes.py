@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
-from app.models.event import Booking, Dispute, Event, Notification, Payout, CancellationPolicy
+from app.models.event import Booking, Dispute, Event, Notification, Payout, Shift, CancellationPolicy
 from app.models.schemas import (
     CancellationPolicyResponse,
     CancellationPolicyUpdate,
@@ -28,6 +28,17 @@ def create_dispute(
     event = db.query(Event).filter(Event.id == data.event_id).first()
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
+
+    # Verify user is involved in the event (customer or assigned worker)
+    if current_user.role == "customer" and event.customer_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to file a dispute for this event")
+    elif current_user.role == "worker":
+        has_shift = db.query(Shift).filter(
+            Shift.event_id == data.event_id,
+            Shift.worker_id == current_user.id,
+        ).first()
+        if not has_shift:
+            raise HTTPException(status_code=403, detail="Not authorized to file a dispute for this event")
 
     dispute = Dispute(
         event_id=data.event_id,
