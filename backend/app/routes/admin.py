@@ -289,18 +289,28 @@ def assign_worker(
     )
     db.add(notification)
 
-    # Add worker to event chat room if one exists
+    # Add worker to event chat room, creating one if it doesn't exist
     chat_room = db.query(ChatRoom).filter(
         ChatRoom.event_id == event_id,
         ChatRoom.room_type == "event",
     ).first()
-    if chat_room:
-        existing_member = db.query(ChatRoomMember).filter(
-            ChatRoomMember.room_id == chat_room.id,
-            ChatRoomMember.user_id == data.worker_id,
-        ).first()
-        if not existing_member:
-            db.add(ChatRoomMember(room_id=chat_room.id, user_id=data.worker_id))
+    if not chat_room:
+        chat_room = ChatRoom(
+            event_id=event_id,
+            room_type="event",
+            name=f"Event: {event.name}",
+            created_by=event.customer_id,
+        )
+        db.add(chat_room)
+        db.flush()
+        # Add customer as first member
+        db.add(ChatRoomMember(room_id=chat_room.id, user_id=event.customer_id))
+    existing_member = db.query(ChatRoomMember).filter(
+        ChatRoomMember.room_id == chat_room.id,
+        ChatRoomMember.user_id == data.worker_id,
+    ).first()
+    if not existing_member:
+        db.add(ChatRoomMember(room_id=chat_room.id, user_id=data.worker_id))
 
     db.commit()
     db.refresh(shift)
