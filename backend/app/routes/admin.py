@@ -380,17 +380,19 @@ def generate_payouts(
 
     booking = db.query(Booking).filter(Booking.event_id == event_id).first()
     if booking:
-        invoice = Invoice(
-            booking_id=booking.id,
-            event_id=event_id,
-            customer_id=booking.customer_id,
-            amount=booking.total_amount - booking.platform_fee,
-            platform_fee=booking.platform_fee,
-            total=booking.total_amount,
-            status="paid",
-            paid_at=datetime.now(timezone.utc),
-        )
-        db.add(invoice)
+        existing_invoice = db.query(Invoice).filter(Invoice.booking_id == booking.id).first()
+        if not existing_invoice:
+            invoice = Invoice(
+                booking_id=booking.id,
+                event_id=event_id,
+                customer_id=booking.customer_id,
+                amount=booking.total_amount - booking.platform_fee,
+                platform_fee=booking.platform_fee,
+                total=booking.total_amount,
+                status="paid",
+                paid_at=datetime.now(timezone.utc),
+            )
+            db.add(invoice)
         booking.status = "completed"
 
     db.commit()

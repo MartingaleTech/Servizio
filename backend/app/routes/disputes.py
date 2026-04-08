@@ -38,6 +38,7 @@ def create_dispute(
         description=data.description,
     )
     db.add(dispute)
+    db.flush()
 
     # Notify admins
     admins = db.query(User).filter(User.role == "admin").all()

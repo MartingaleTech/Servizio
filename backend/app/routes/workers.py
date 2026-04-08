@@ -339,19 +339,19 @@ def get_earnings(
 
     weekly_payouts = sum(
         p.amount for p in payouts
-        if p.created_at and p.created_at >= week_ago
+        if p.created_at and p.created_at.replace(tzinfo=timezone.utc) >= week_ago
     )
     monthly_payouts = sum(
         p.amount for p in payouts
-        if p.created_at and p.created_at >= month_ago
+        if p.created_at and p.created_at.replace(tzinfo=timezone.utc) >= month_ago
     )
     weekly_tips = sum(
         t.amount for t in tips
-        if t.created_at and t.created_at >= week_ago
+        if t.created_at and t.created_at.replace(tzinfo=timezone.utc) >= week_ago
     )
     monthly_tips = sum(
         t.amount for t in tips
-        if t.created_at and t.created_at >= month_ago
+        if t.created_at and t.created_at.replace(tzinfo=timezone.utc) >= month_ago
     )
 
     return {
