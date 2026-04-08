@@ -112,6 +112,9 @@ def create_tip(
             )
             db.add(notif)
 
+    if not tips:
+        raise HTTPException(status_code=400, detail="No tips were created. Please provide valid worker tip amounts.")
+
     db.commit()
     return [TipResponse.model_validate(t) for t in tips]
 

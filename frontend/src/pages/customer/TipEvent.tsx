@@ -109,7 +109,7 @@ export default function TipEvent() {
                 Split Evenly
               </button>
               <button
-                onClick={() => setSplitType('per_worker')}
+                onClick={() => { setSplitType('per_worker'); setTotalTip(0); }}
                 className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border ${
                   splitType === 'per_worker' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600'
                 }`}
