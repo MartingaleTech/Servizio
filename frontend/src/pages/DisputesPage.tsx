@@ -35,6 +35,19 @@ export default function DisputesPage() {
     loadDisputes();
     if (user?.role === 'customer') {
       api.get<Event[]>('/api/events').then(setEvents).catch(() => {});
+    } else if (user?.role === 'worker') {
+      // Workers can't access /api/events — derive events from their shifts
+      api.get<Array<{ event_id: string; event_name?: string }>>('/api/workers/shifts').then(shifts => {
+        const seen = new Set<string>();
+        const workerEvents: Event[] = [];
+        for (const s of shifts) {
+          if (s.event_id && !seen.has(s.event_id)) {
+            seen.add(s.event_id);
+            workerEvents.push({ id: s.event_id, name: s.event_name || s.event_id } as Event);
+          }
+        }
+        setEvents(workerEvents);
+      }).catch(() => {});
     }
   }, []);
 

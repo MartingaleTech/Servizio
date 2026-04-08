@@ -7,7 +7,7 @@ from sqlalchemy import func
 
 from app.core.database import get_db
 from app.core.security import require_role
-from app.models.event import Booking, Event, Invoice, Payout, PricingRule, Shift, Notification
+from app.models.event import Booking, ChatRoom, ChatRoomMember, Event, Invoice, Payout, PricingRule, Shift, Notification
 from app.models.schemas import (
     AdminStats,
     BookingResponse,
@@ -288,6 +288,19 @@ def assign_worker(
         reference_id=event_id,
     )
     db.add(notification)
+
+    # Add worker to event chat room if one exists
+    chat_room = db.query(ChatRoom).filter(
+        ChatRoom.event_id == event_id,
+        ChatRoom.room_type == "event",
+    ).first()
+    if chat_room:
+        existing_member = db.query(ChatRoomMember).filter(
+            ChatRoomMember.room_id == chat_room.id,
+            ChatRoomMember.user_id == data.worker_id,
+        ).first()
+        if not existing_member:
+            db.add(ChatRoomMember(room_id=chat_room.id, user_id=data.worker_id))
 
     db.commit()
     db.refresh(shift)

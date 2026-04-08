@@ -185,6 +185,8 @@ def resolve_dispute(
     if not dispute:
         raise HTTPException(status_code=404, detail="Dispute not found")
 
+    if data.status not in ("resolved", "dismissed"):
+        raise HTTPException(status_code=400, detail="Status must be 'resolved' or 'dismissed'")
     dispute.status = data.status
     dispute.resolution = data.resolution
     dispute.resolved_by = current_user.id
